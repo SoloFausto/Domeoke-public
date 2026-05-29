@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Domeoke</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body class="purple-theme">
+    <header>
+      <button class="back-button" onclick="window.history.back()">
+        <img src="/static/back_purple.png" alt="Back" />
+      </button>
+      <h1 style="font-size: 50px">Domeoke</h1>
+    </header>
+
+    <main>
+      <div class="app-layout">
+        <div class="songs-section">
+          <h2>Available Youtube Videos</h2>
+          <div class="search">
+            <input
+              type="search"
+              name="search"
+              placeholder="Search songs by title or artist"
+              hx-get="/query_youtube"
+              hx-trigger="keyup changed delay:750ms"
+              hx-target=".song-list"
+              hx-swap="outerHTML"
+              hx-indicator=".spinner"
+              style="
+                padding: 16px 20px;
+                font-size: 30px;
+                border-radius: 10px;
+                position: absolute;
+                left: 50%;
+                transform: translateX(-50%);
+              "
+            />
+          </div>
+
+          <div class="song-list"></div>
+          <img src="/static/loading.gif" alt="Loading" class="spinner" />
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

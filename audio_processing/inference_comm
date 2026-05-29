@@ -1,0 +1,10 @@
+python inference.py \
+    --model_type mel_band_roformer \
+    --config_path configs/config_melbandroformer_inst_v2.yaml \
+    --start_check_point results/melband_roformer_inst_v2.ckpt \
+    --audio_file input_audio/soda.mp3 \
+    --store_dir output_audio/
+
+
+
+    https://github.com/jarredou/Music-Source-Separation-Training-Colab-Inference/blob/main/README.md

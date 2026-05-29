@@ -1,0 +1,13 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app/DOMEOKE-BACKEND
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+    command: bash /app/DOMEOKE-BACKEND/scripts/run.sh
+  # Add any additional services here if needed, such as a database or cache.

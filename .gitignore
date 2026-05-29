@@ -1,0 +1,17 @@
+.venv/
+processing/base_lyrics/*
+processing/input_audio/*
+processing/output_audio/*
+processing/sentence_level_srt/*
+processing/word_level_srt/*
+processing/word_level_srt/*
+audio-processing/results/*
+__pycache__/*
+
+tmp/*
+lyrics_searcher/node_modules/*
+downloaders/__pycache__/*
+static/video.mp4
+downloaders/__pycache__/lyrics_api.cpython-312.pyc
+processing/thumbnails/*
+downloaders/__pycache__/lyrics_api.cpython-312.pyc

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Domeoke</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body class="simple-page">
+    <div class="loader-wrapper" id="loader">
+      <span class="loader"><span class="loader-inner"></span></span>
+    </div>
+
+    <header>
+      <button class="back-button" onclick="window.history.back()">
+        <img src="/static/back_cyan.png" alt="Back" />
+      </button>
+      <h1>Domeoke</h1>
+    </header>
+
+    <main>
+      <div class="app-layout">
+        <div class="songs-section">
+          <h2>Available Songs</h2>
+          <div class="search">
+            <input
+              type="search"
+              name="search"
+              placeholder="Search songs by title or artist"
+              hx-get="/query"
+              hx-trigger="keyup changed delay:300ms"
+              hx-target=".song-list"
+              hx-swap="outerHTML"
+              hx-indicator=".search"
+            />
+          </div>
+
+          <div class="song-list"></div>
+        </div>
+      </div>
+    </main>
+    <div class="content"></div>
+
+    <script>
+      $(window).on("load", function () {
+        $("#loader-wrapper").fadeOut("slow");
+      });
+    </script>
+  </body>
+</html>

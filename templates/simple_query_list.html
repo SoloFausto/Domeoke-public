@@ -1,0 +1,17 @@
+<div class="song-list">
+    <ul>
+        {% for song in songs %}
+        <link rel="stylesheet" href="/static/styles.css">
+        <li data-id="{{song.id}}" class="song-item">
+            <img src="{{song.cover}}" alt="{{song.title}} cover" class="song-image">
+            <div class="details">
+                <h3>{{song.title}}</h3>
+                <p>{{song.artist}}</p>
+            </div>
+            <button class="add-to-queue-btn" hx-post="/process/{{song.artist}}/{{song.title}}" title="Add to queue">
+            +
+            </button>
+        </li>
+        {% endfor %}
+    </ul>
+  </div>

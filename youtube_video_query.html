@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <div class="song-list">
+    <ul>
+      {% for song in songs %}
+      <li data-id="{{song.id}}" class="song-item">
+        <img
+          src="{{song.thumbnail}}"
+          alt="{{song.title}} cover"
+          class="song-image"
+        />
+        <div class="details">
+          <h3>{{song.title}}</h3>
+          <p>{{song.author}}</p>
+        </div>
+        <button
+          class="add-to-queue-btn"
+          hx-post="/youtube_video/{{song.watch_url}}"
+          title="Add to queue"
+        >
+          +
+        </button>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</html>

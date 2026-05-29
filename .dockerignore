@@ -1,0 +1,27 @@
+# Ignore the virtual environment directory
+.venv
+node_modules/
+lyrics_searcher/node_modules/
+
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore log files
+*.log
+
+# Ignore downloaded model artifacts; Dockerfile downloads them during build
+audio_processing/results/*.ckpt
+audio_processing/results/*.ckpt.*
+
+# Ignore local development files
+*.env
+*.local
+
+# Ignore Docker-related files
+docker-compose.yml
+
+# Ignore any other files that are not needed in the container
+README.md
+*.md
