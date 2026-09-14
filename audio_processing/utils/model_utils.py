@@ -2,6 +2,7 @@
 __author__ = 'Roman Solovyev (ZFTurbo): https://github.com/ZFTurbo/'
 
 import argparse
+import os
 import numpy as np
 import torch
 import torch.nn as nn
@@ -10,6 +11,7 @@ from torch.optim import Adam, AdamW, SGD, RAdam, RMSprop
 from tqdm.auto import tqdm
 from typing import Dict, List, Tuple, Any, Union
 import loralib as lora
+from audio_processing.device import get_device, mixed_precision
 
 
 def demix(
@@ -36,7 +38,7 @@ def demix(
     mix : torch.Tensor
         Input audio tensor with shape (channels, time).
     device : torch.device
-        The computation device (CPU or CUDA).
+        The computation device (CPU, CUDA/ROCm, XPU, or MPS).
     model_type : str, optional
         Processing mode:
             - "demucs" for logic specific to the Demucs model.
@@ -81,7 +83,7 @@ def demix(
 
     use_amp = getattr(config.training, 'use_amp', True)
 
-    with torch.cuda.amp.autocast(enabled=use_amp):
+    with mixed_precision(device, enabled=use_amp):
         with torch.inference_mode():
             # Initialize result and counter tensors
             req_shape = (num_instruments,) + mix.shape
@@ -163,7 +165,7 @@ def demix(
 
 
 
-def initialize_model_and_device(model: torch.nn.Module, device_ids: List[int]) -> Tuple[Union[torch.device, str], torch.nn.Module]:
+def initialize_model_and_device(model: torch.nn.Module, device_ids: List[int]) -> Tuple[torch.device, torch.nn.Module]:
     """
     Initialize the model and assign it to the appropriate device (GPU or CPU).
 
@@ -175,17 +177,30 @@ def initialize_model_and_device(model: torch.nn.Module, device_ids: List[int]) -
         A tuple containing the device and the model moved to that device.
     """
 
-    if torch.cuda.is_available():
-        if len(device_ids) <= 1:
-            device = torch.device(f'cuda:{device_ids[0]}')
-            model = model.to(device)
-        else:
-            device = torch.device(f'cuda:{device_ids[0]}')
-            model = nn.DataParallel(model, device_ids=device_ids).to(device)
-    else:
-        device = 'cpu'
-        model = model.to(device)
-        print("CUDA is not available. Running on CPU.")
+    device = get_device()
+    if device.type in ('cuda', 'xpu'):
+        requested = os.environ.get('DOMEOKE_DEVICE', 'auto').strip().lower()
+        explicit_index = ':' in requested
+        if device_ids:
+            if explicit_index and device.index != device_ids[0]:
+                raise ValueError(
+                    f"DOMEOKE_DEVICE={requested} conflicts with primary device ID {device_ids[0]}."
+                )
+            device = torch.device(device.type, device_ids[0])
+        if len(device_ids) > 1 and device.type != 'cuda':
+            raise ValueError("Multiple XPU devices are not supported; select one device ID.")
+        backend = getattr(torch, device.type)
+        for index in device_ids:
+            if index < 0 or index >= backend.device_count():
+                raise ValueError(f"Device index {index} is unavailable for backend {device.type}.")
+        if len(device_ids) != len(set(device_ids)):
+            raise ValueError("Device IDs must be unique.")
+    elif len(device_ids) > 1:
+        raise ValueError(f"Multiple devices are not supported for backend {device.type}.")
+
+    model = model.to(device)
+    if device.type == 'cuda' and len(device_ids) > 1:
+        model = nn.DataParallel(model, device_ids=device_ids)
 
     return device, model
 

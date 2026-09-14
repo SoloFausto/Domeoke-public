@@ -13,9 +13,9 @@ Secondly, Domeoke can also generate its own karaoke versions of most songs throu
 The Domeoke server is primarily a Flask server that hosts a website from where the clients can browse and select songs. It also keeps an active connection with all the clients where it sends the finished instrumentals and lyrics.
 
 The custom audio pipeline consists of a few steps: 
-1. Fetch the lyrics and studio version of the song
-2. Separate the vocals from the instrumental
-3. Detect the language of the song
+1. Fetch the lyrics
+2. Detect the predominant language from the lyrics text
+3. Download the studio audio and separate the vocals from the instrumental
 4. Force align the lyrics with the song, generating a word by word timestamps of where each word is situated in the lyrics
 5. Join these word level timestamps to make full sentences again
 This pipeline has a couple shortcomings that make it not really able to be used in every situation: Firstly, for a requested song there might not be lyrics available for it; secondly, the forced alignment that we do is suceptible to fail in situations where a song features more than one language or the singing isn't quite clear.
@@ -25,9 +25,10 @@ Between the server and the display frontend we use Message Pack to send the fini
 
 We also run a node server to fetch the lyrics, this server exposes a rest interface that lets the Flask frontend get the lyrics from a javascript library.
 
-### Setup:
-It is recomended to run the server under Debian or Ubuntu. To set everything up, first download and unpack the server with git clone, then run the automated setup script that is called setup.sh, and finally run the application with ./run.sh which will run both the node server and the flask server.
-NeMo requires python version >=3.10. 
+### Browser display
+Open `http://<server>:5000/display` (or **Open karaoke display** on the home page) before requesting a song. Keep it open on the screen used for singing, and use **Choose a song** to open the generated-song selector in another tab. Other devices can use the same server address.
+
+The display connects to `/webSockets` on the same host, receives MessagePack WAV/SRT/PNG broadcasts, and plays the instrumental with synchronized current, previous, and upcoming lyric lines. Playback controls provide pause, seeking, and volume; **Fullscreen** expands the stage. If autoplay is blocked, press Play once the song is ready.
 
 ### TODO:
 - Research what Nvidia has with Forced aligment: https://research.nvidia.com/labs/conv-ai/blogs/2023/2023-08-forced-alignment/#formulating-the-problem
@@ -42,7 +43,7 @@ NeMo requires python version >=3.10.
 
 ### Credits:
 **Main Programmers:**
-Fausto Gabriel De Leon Fuentes (Lead programmer),
+Fausto De Leon (Lead programmer),
 Yibo (Kendall) Wang (Frontend Programmer)
 
 **Aditional Advising:**
@@ -54,10 +55,10 @@ Joseph Eakin
 Domeoke's custom audio pipeline and other functionality could not work without these libraries:
 
 - Flask (Licenced under BSD 3-Clause "New" or "Revised" License)
-- Speechbrain (Licenced under Apache License 2.0)
+- langdetect (Licensed under Apache License 2.0)
 - Lyrics.ovh (Licenced under GNU General Public License v3.0)
 - alltomp3 (Licenced under GNU Affero General Public License v3.0)
-- pytubefix (Licenced under MIT Licence)
+- yt-dlp (Unlicense)
 - ytmusicapi (Licenced under MIT Licence)
 - Music-Source-Separation-Training (Licenced under MIT Licence)
 - stable-ts (Licenced under MIT Licence)

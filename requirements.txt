@@ -1,6 +1,8 @@
-torch==2.5.1
-torchaudio==2.5.1
-speechbrain==1.0.3
+# Install with scripts/setup.py so exact backend wheels and constraints are selected.
+torch==2.8.0
+torchaudio==2.8.0
+torchvision==0.23.0
+langdetect==1.0.9
 numpy==1.26.4
 numba==0.60.0
 tiktoken
@@ -28,7 +30,6 @@ torch_audiomentations
 asteroid
 auraloss
 torchseg
-bitsandbytes
 wandb
 accelerate
 huggingface-hub<1.0
@@ -39,10 +40,10 @@ pyaudio
 keyboard
 matplotlib
 hyper_connections
-sageattention
 srt
-stable-ts
-pytubefix
+openai-whisper==20250625
+stable-ts==2.19.1
+yt-dlp[default]
 flask
 ytmusicapi
 flask_sock

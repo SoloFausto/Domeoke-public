@@ -4,7 +4,8 @@ import time
 import random
 import urllib.request
 from ytmusicapi import YTMusic
-from pytubefix import YouTube, Search
+from pathlib import Path
+from yt_dlp import YoutubeDL
 
 
 def fetch_song_choices(query: str):
@@ -27,20 +28,37 @@ def download_song_audio(artist: str,song: str, song_index: int = 0):
 
     ytmusic = YTMusic()
     yt_id = ytmusic.search(query, filter="songs")[song_index]['videoId']
-    yt = YouTube(f'http://youtube.com/watch?v={yt_id}')
-    ys = yt.streams.get_audio_only()
-    ys.download(output_path='processing/input_audio')
-    return [ys.default_filename, yt_id]
+    options = {
+        "format": "bestaudio/best",
+        "outtmpl": "processing/input_audio/%(id)s.%(ext)s",
+        "noplaylist": True,
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }],
+    }
+    with YoutubeDL(options) as downloader:
+        info = downloader.extract_info(f"https://www.youtube.com/watch?v={yt_id}", download=True)
+        filename = Path(downloader.prepare_filename(info)).with_suffix(".mp3").name
+    return [filename, yt_id]
 
 def download_youtube_video(id: str):
-    yt = YouTube(f'http://youtube.com/watch?v={id}')
-    ys = yt.streams.get_highest_resolution()
-    ys.download(output_path='static',filename="video.mp4")
-    return ys.default_filename
+    options = {
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]",
+        "merge_output_format": "mp4",
+        "outtmpl": "static/video.%(ext)s",
+        "noplaylist": True,
+        "overwrites": True,
+    }
+    with YoutubeDL(options) as downloader:
+        downloader.extract_info(f"https://www.youtube.com/watch?v={id}", download=True)
+    return "video.mp4"
 
 def download_youtube_thumbnail(id: str):
     thumbnail_url = f'https://img.youtube.com/vi/{id}/maxresdefault.jpg'
     filename = f'processing/thumbnails/{id}.jpg'
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
     urllib.request.urlretrieve(thumbnail_url, filename)
     return filename
 
@@ -62,17 +80,20 @@ def make_request(url, timeout=10):
     return None
 
 def suggest_youtube_videos(query: str):
-    results = Search(query)
-    video_choices = list()
-
-    for video in results.videos:
-        watchid = video.watch_url.replace('https://youtube.com/watch?v=', '')
+    options = {"extract_flat": "in_playlist", "skip_download": True}
+    with YoutubeDL(options) as downloader:
+        results = downloader.extract_info(f"ytsearch20:{query}", download=False)
+    video_choices = []
+    for video in results.get("entries", []):
+        if not video or not video.get("id"):
+            continue
+        thumbnails = video.get("thumbnails") or []
         video_choices.append({
-            'title': video.title,
-            'watch_url': watchid,
-            'length': video.length,
-            'thumbnail': video.thumbnail_url,
-            'author': video.author,
+            "title": video.get("title") or video["id"],
+            "watch_url": video["id"],
+            "length": video.get("duration"),
+            "thumbnail": thumbnails[-1]["url"] if thumbnails else "",
+            "author": video.get("channel") or video.get("uploader") or "",
         })
     return video_choices
 

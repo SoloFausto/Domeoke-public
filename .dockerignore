@@ -11,7 +11,7 @@ __pycache__/
 # Ignore log files
 *.log
 
-# Ignore downloaded model artifacts; Dockerfile downloads them during build
+# Ignore downloaded model artifacts; Dockerfile restores them from a BuildKit cache
 audio_processing/results/*.ckpt
 audio_processing/results/*.ckpt.*
 

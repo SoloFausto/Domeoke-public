@@ -20,12 +20,10 @@ from utils.audio_utils import normalize_audio, denormalize_audio
 from utils.settings import get_model_from_config, parse_args_inference
 from utils.model_utils import demix
 from utils.model_utils import prefer_target_instrument, apply_tta
+from audio_processing.device import get_device, inference_resources
 
-import warnings
 
-warnings.filterwarnings("ignore")
-
-def load_start_checkpoint(start_check_point, model: torch.nn.Module, device) -> None:
+def load_start_checkpoint(start_check_point, model: torch.nn.Module) -> None:
     """
     Load the starting checkpoint for a model.
 
@@ -34,7 +32,7 @@ def load_start_checkpoint(start_check_point, model: torch.nn.Module, device) -> 
         model: PyTorch model to load the checkpoint into.
         type_: how to load weights - for train we can load not fully compatible weights
     """
-    state_dict = torch.load(start_check_point, map_location=device, weights_only=True)
+    state_dict = torch.load(start_check_point, map_location="cpu", weights_only=True)
     model.load_state_dict(state_dict)
 
 def run_wav(audio_file, store_dir, model_type, use_tta, force_cpu,config_path, start_checkpoint, verbose: bool = False):
@@ -50,26 +48,27 @@ def run_wav(audio_file, store_dir, model_type, use_tta, force_cpu,config_path, s
     config : Dict
         Configuration object with audio and inference settings.
     device : torch.device
-        Device for model inference (CPU or CUDA).
+        Device for model inference (CUDA/ROCm, XPU, MPS, or CPU).
     verbose : bool, optional
         If True, prints detailed information during processing. Default is False.
     """
-    device = "cpu"
-    if force_cpu:
-        device = "cpu"
-    elif torch.cuda.is_available():
-        print('CUDA is available')
-        device = f'cuda:0'
-    elif torch.backends.mps.is_available():
-        device = "mps"
+    device = get_device(force_cpu=force_cpu)
+    with inference_resources(device):
+        return _run_wav(audio_file, store_dir, model_type, use_tta, device,
+                        config_path, start_checkpoint, verbose)
+
+
+def _run_wav(audio_file, store_dir, model_type, use_tta, device, config_path, start_checkpoint, verbose):
+    # Keep models and tensors in this frame so cleanup runs after it exits.
     print("Using device: ", device)
 
 
-    torch.backends.cudnn.benchmark = True
+    if device.type == "cuda" and not torch.version.hip:
+        torch.backends.cudnn.benchmark = True
 
     model, config = get_model_from_config(model_type, config_path)
 
-    load_start_checkpoint(start_checkpoint, model, device)
+    load_start_checkpoint(start_checkpoint, model)
     print("Instruments: {}".format(config.training.instruments))
 
     model = model.to(device)

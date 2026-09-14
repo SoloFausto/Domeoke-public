@@ -7,6 +7,16 @@ else
     source .venv/bin/activate
 fi
 
+# Use the installed backend by default; an explicit CPU override remains valid.
+if [ -z "${DOMEOKE_DEVICE:-}" ] && [ -f "${VIRTUAL_ENV}/domeoke-backend" ]; then
+    DOMEOKE_DEVICE=$(cat "${VIRTUAL_ENV}/domeoke-backend")
+fi
+export DOMEOKE_DEVICE="${DOMEOKE_DEVICE:-auto}"
+python -m audio_processing.device
+
+# Bind mounts can hide processing directories created during the image build.
+mkdir -p processing/sentence_level_srt
+
 flask run --host=0.0.0.0 --port=5000 &
 FLASK_PID=$!
 

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Domeoke · Live display</title>
+  <link rel="stylesheet" href="/static/display.css">
+  <script defer src="/static/vendor/msgpack.min.js"></script>
+  <script defer src="/static/display.js"></script>
+</head>
+<body>
+  <header>
+    <a class="brand" href="/">Domeoke<span>LIVE DISPLAY</span></a>
+    <div id="connection" role="status" data-state="connecting">Connecting to backend…</div>
+    <button id="fullscreen" type="button">Fullscreen</button>
+  </header>
+  <main>
+    <section class="track" aria-label="Current song">
+      <img id="cover" alt="Song cover" hidden>
+      <div><p class="eyebrow">NOW ON STAGE</p><h1 id="title">Your stage is ready</h1></div>
+    </section>
+    <section class="lyrics" aria-label="Synchronized lyrics">
+      <p id="previous" class="previous"></p>
+      <p id="current" class="current">Choose a song.</p>
+      <p id="next" class="next">Open song selection on another tab or device to begin.</p>
+    </section>
+    <section class="transport" aria-label="Playback controls">
+      <p id="status" role="status">Waiting for audio and lyrics from the backend.</p>
+      <audio id="audio" controls preload="auto" aria-label="Song playback"></audio>
+      <p class="hint">If your browser blocks autoplay, press Play below when the song is ready.</p>
+      <a href="/simple_page" target="_blank" rel="noopener">Choose a song <span aria-hidden="true">↗</span></a>
+    </section>
+  </main>
+</body>
+</html>

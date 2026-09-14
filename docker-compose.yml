@@ -3,11 +3,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        DOMEOKE_BACKEND: ${DOMEOKE_BACKEND:?Run python scripts/docker.py to detect the host GPU, or explicitly set DOMEOKE_BACKEND=cpu for CPU-only execution}
     volumes:
       - .:/app/DOMEOKE-BACKEND
+      - model-checkpoints:/app/DOMEOKE-BACKEND/audio_processing/results
     ports:
       - "5000:5000"
     environment:
       - FLASK_ENV=development
+      - DOMEOKE_DEVICE=${DOMEOKE_BACKEND:?Select the backend with python scripts/docker.py}
     command: bash /app/DOMEOKE-BACKEND/scripts/run.sh
-  # Add any additional services here if needed, such as a database or cache.
+  # GPU users: python scripts/docker.py (detects host before build and adds devices).
+
+volumes:
+  model-checkpoints:

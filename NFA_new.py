@@ -25,7 +25,7 @@ import shutil
 class NeMoForcedAlignerWorkflow:
     """Main workflow class for NeMo Forced Alignment process."""
     
-    def __init__(self, work_dir: str = r"C:\Users\ywang8\Desktop\NFA test\WORK_DIR", nemo_dir: str = r"C:\Users\ywang8\Desktop\NFA test\NeMo"):
+    def __init__(self, work_dir: str = r"", nemo_dir: str = r""):
         self.work_dir = Path(work_dir)
         self.nemo_dir = Path(nemo_dir)
         self.setup_logging()
@@ -276,8 +276,8 @@ class NeMoForcedAlignerWorkflow:
 def main():
     """Main entry point for the script."""
     parser = argparse.ArgumentParser(description="NeMo Forced Aligner Workflow - ASS Generation")
-    parser.add_argument("--work-dir", default=r"C:\Users\ywang8\Desktop\NFA test\WORK_DIR", help="Working directory for output files")
-    parser.add_argument("--nemo-dir", default=r"C:\Users\ywang8\Desktop\NFA test\NeMo", help="NeMo repository directory")
+    parser.add_argument("--work-dir", default=r"", help="Working directory for output files")
+    parser.add_argument("--nemo-dir", default=r"", help="NeMo repository directory")
     # Hardcoded file paths - no need to specify on command line
     # parser.add_argument("--audio-file", required=True, help="Path to audio file for alignment")
     # parser.add_argument("--text", help="Reference text for alignment")
@@ -292,8 +292,8 @@ def main():
         logging.getLogger().setLevel(logging.DEBUG)
     
     # Hardcoded file paths
-    audio_file = r"C:\Users\ywang8\Desktop\NFA test\audio&text\Taylor Swift - The Fate of Ophelia (Official Music Video).mp3"
-    text_file = r"C:\Users\ywang8\Desktop\NFA test\audio&text\The Fate Of Ophelia.txt"
+    audio_file = r""
+    text_file = r""
     
     # Read text from the hardcoded file
     try:

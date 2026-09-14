@@ -1,0 +1,91 @@
+### Browser display
+Processing and connection status appear on screen. The display reconnects automatically after a disconnect, but the backend does not replay missed files: request the song again if the display joined or reconnected after its files were sent.
+
+This display supports generated songs. The existing `youtube_video` notification contains no video URL or media, so YouTube video playback is not supported on this screen. The MessagePack browser library is vendored at version 3.1.2 in `static/vendor`, with its license, so display playback needs no external CDN.
+
+#### YouTube downloads
+
+YouTube search and downloads use [yt-dlp](https://github.com/yt-dlp/yt-dlp). The `yt-dlp[default]` dependency includes the YouTube challenge-solving scripts.
+
+Videos are downloaded and merged into `static/video.mp4`, replacing the previously selected video. Audio for generated songs is converted to `processing/input_audio/<video-id>.mp3`. Keep the downloader and its challenge scripts current with `python -m pip install -U "yt-dlp[default]"` when YouTube changes break extraction.
+
+#### Verification
+
+Run `python -m unittest discover -s tests -v` in the installed environment. Tests cover backend selection, explicit-device failures, CPU overrides, attention/precision behavior, Whisper sparse-metadata/timestamp compatibility, lyrics-language normalization and repeatability, and worker exit/error boundaries. GPU checks run on available devices without model downloads.
+
+
+#### Docker
+
+Docker builds cannot discover host GPUs. Use the host launcher, with Docker Engine and the Compose plugin installed:
+
+```sh
+python3.11 scripts/docker.py --dry-run
+python3.11 scripts/docker.py --detach
+# Or explicitly choose: --backend cuda|rocm|xpu|cpu
+```
+
+The launcher selects the build backend and passes NVIDIA reservations, `/dev/dri` plus AMD `/dev/kfd` on Linux, or `/dev/dxg` and WSL driver-library mounts. AMD WSL also needs its installed `/opt/rocm/lib/libhsa-runtime64.so.1.2`. AMD/Intel users must run the launcher inside native Linux or a GPU-enabled WSL distribution whose Docker Engine can access these devices; Docker Desktop GPU passthrough is not assumed.
+
+The Ubuntu 24.04 image includes FFmpeg, Deno, and backend-specific userspace dependencies (including Intel Level Zero/OpenCL for XPU). Compose now requires a selected backend rather than silently defaulting to CPU; the host launcher supplies it automatically, including when the shell inherited a different backend. For deliberate CPU-only operation, use `DOMEOKE_BACKEND=cpu docker compose up --build`. A direct Docker build also requires an explicit `DOMEOKE_BACKEND` build argument. Host drivers remain prerequisites. GPU checks run at container startup, not during image build. Optional `INSTALL_NEMO=1` is restricted to CUDA ASR dependencies; NeMo is not required for the standard inference pipeline.
+
+If startup reports `PyTorch 2.8.0+cpu`, the running environment contains CPU-only wheels. `DOMEOKE_DEVICE=xpu` cannot enable GPU acceleration in that build. The GPU wheels must come from the appropiate  Pytorch
+
+Successful Intel startup should report `PyTorch 2.8.0+xpu; selected device: xpu:0`. Merely restarting an existing CPU image or activating the old CPU virtual environment will not change its installed backend.
+
+#### Runtime selection and diagnostics
+
+Source separation and Whisper alignment/refinement use the same GPU device selector. ROCm uses PyTorch's `cuda` namespace internally; Intel uses `xpu`. Attention dispatch and mixed precision follow the actual tensor backend rather than NVIDIA compute capability.
+
+Language identification uses [langdetect](https://github.com/Mimino666/langdetect) on the scraped lyrics before downloading or processing audio. Its bundled profiles require no audio model, GPU, or runtime model download. A fixed seed makes repeated detections consistent; Chinese script variants map to Whisper's `zh` code. Empty or undetectable text raises an error rather than silently defaulting to English. Short, ambiguous, or multilingual lyrics can still be misclassified; one predicted language is used for the whole song.
+
+```sh
+source .venv/bin/activate
+python -m audio_processing.device
+python scripts/setup.py --backend xpu --check
+
+# Optional overrides; CPU works even with GPU wheels installed.
+DOMEOKE_DEVICE=xpu:0 bash scripts/run.sh
+DOMEOKE_DEVICE=rocm:0 bash scripts/run.sh
+DOMEOKE_DEVICE=cpu bash scripts/run.sh
+```
+
+`DOMEOKE_DEVICE` accepts `auto`, `cpu`, `cuda[:N]`, `rocm[:N]`, `xpu[:N]`, or `mps`. The launcher defaults to the backend recorded by setup. Explicit unavailable GPUs fail instead of silently falling back to CPU. Post-install `--check` verifies wheel identities and executes real matrix multiplication, attention, and convolution. `--check` takes the installed backend name, not a device index. Multiple XPU devices in `initialize_model_and_device` are rejected; CUDA/ROCm retain DataParallel support.
+
+Whisper's sparse alignment-head metadata stays on CPU, while its neural layers and median filtering run on the selected GPU. Timestamp DTW/backtrace uses the CPU implementation outside NVIDIA CUDA; this avoids CUDA-only Triton kernels and unsupported FP64 operations on Arc. Setup builds the pinned Whisper wheel with only its unconditional NVIDIA Triton dependency removed; application code supplies the portable timestamp dispatch. Optional NVIDIA-only SageAttention/bitsandbytes are not installed by default. Existing MPS runtime selection is retained, but automatic macOS/ARM installation is not provided.
+
+The web and standalone entry points use `audio_processing.pipeline.process_audio`, which launches one disposable `audio_processing.worker` process per song. The worker performs separation, alignment/refinement, and subtitle generation using the same Python environment and GPU selection. The parent receives only file paths, and only after the worker has exited. Flask does not import the GPU-processing modules or keep a GPU context alive. 
+
+Within the worker, each separation or alignment/refinement stage still collects model reference cycles and releases unused PyTorch allocator memory to reduce peak usage. Cleanup also runs on failure, and the worker exits with a nonzero status rather than delivering partial results as success. System-wide VRAM includes the desktop and other processes, so it need not reach zero. Restart the backend once after deploying worker isolation to clear GPU contexts retained by the old web process.
+
+#### GPU backends
+
+| Backend | PyTorch wheel index | Requirements |
+| --- | --- | --- |
+| NVIDIA | `cu128` | CUDA 12.8-compatible NVIDIA driver; NVIDIA Container Toolkit for Docker |
+| AMD Radeon | `rocm6.4` | A supported Radeon model, ROCm 6.4.2 driver/userspace, and a supported Linux/WSL OS; native Windows ROCm is not supported by this installer |
+| Intel Arc / Max | `xpu` | Intel GPU driver, Level Zero GPU compute runtime **and** OpenCL runtime/ICD |
+| CPU | `cpu` | No GPU driver |
+
+Automatic priority is eligible NVIDIA, Intel Arc/Max, supported Radeon, then CPU. Virtual display adapters, legacy Intel graphics, and unknown AMD integrated GPUs are not treated as supported accelerators.
+
+Override installation with `--backend cpu`, `--backend cuda`, `--backend rocm`, or `--backend xpu`. Use a fresh `--venv` directory when switching vendors; setup refuses mixed-backend environments. Each environment gets persistent pip constraints so later dependency resolution cannot replace its backend wheels or install NVIDIA Triton into an AMD/Intel environment.
+
+AMD detection uses a conservative Radeon model allowlist from the [ROCm 6.4.2 Linux](https://rocm.docs.amd.com/projects/radeon-ryzen/en/docs-6.4.2/docs/compatibility/native_linux/native_linux_compatibility.html) and [WSL compatibility matrices](https://rocm.docs.amd.com/projects/radeon-ryzen/en/docs-6.4.2/docs/compatibility/wsl/wsl_compatibility.html). Ubuntu 22.04/24.04 and native RHEL 9.6 are accepted. A vendor ID alone does not prove ROCm support. Upstream PyTorch 2.8 ROCm wheels are distinct from AMD's production-validated PyTorch 2.6 configuration.
+
+For Intel Linux/WSL, the Level Zero loader alone is insufficient: install `libze-intel-gpu1` (formerly `intel-level-zero-gpu`) and `intel-opencl-icd`, following [Intel's driver instructions](https://dgpu-docs.intel.com/installation-guides/installing-packages-from-the-intel-ppa.html). Intel's [PyTorch 2.8 support matrix](https://www.intel.com/content/www/us/en/developer/articles/tool/pytorch-prerequisites-for-intel-gpu/2-8.html) did not validate B-series on Ubuntu 24.04/WSL; real kernel checks remain required. Arc B580 inference was exercised successfully on WSL with the Intel compute runtime supplied.
+
+### Setup:
+Use **Python 3.10–3.12** on x86-64 Linux/WSL2 or Windows. The installer detects physical GPUs before importing PyTorch and selects matching PyTorch **2.8.0**, TorchAudio **2.8.0**, and TorchVision **0.23.0** wheels. Do not bootstrap GPU environments with a plain `pip install -r requirements.txt`: it cannot choose a vendor-specific wheel index.
+
+Install system prerequisites first: `ffmpeg`/`ffprobe`, Node.js/npm, [Deno 2.3+](https://docs.deno.com/runtime/getting_started/installation/), PortAudio development libraries, a C/C++ compiler, and the appropriate GPU driver/runtime. On native Linux, install `pciutils` so Radeon model names can be checked. Setup installs Python dependencies, Node dependencies, and the separation checkpoint, but never installs host/kernel drivers.
+
+Setup creates the processing directories, including `processing/sentence_level_srt`, even with `--skip-assets`; existing files are preserved and `--dry-run` creates nothing. Startup also ensures the sentence-subtitle directory exists after Docker bind mounts are applied.
+
+```sh
+# Use an installed Python 3.10–3.12 interpreter.
+python3.11 scripts/setup.py --dry-run
+python3.11 scripts/setup.py
+bash scripts/run.sh
+```
+
+`scripts/setup.sh` accepts `PYTHON=/path/to/python3.11`. On Windows, use `py -3.11 scripts/setup.py` (or `scripts\setup.bat` with a supported Python on PATH), then activate `.venv\Scripts\Activate.ps1`. Run `python -m flask run --host=0.0.0.0 --port=5000` and `node lyrics_searcher/index.js` in separate activated terminals.

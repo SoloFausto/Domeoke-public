@@ -1,15 +1,12 @@
 from flask import Flask, abort
 from flask import render_template, request, url_for
 from flask_sock import Sock
-from speechbrain.inference.classifiers import EncoderClassifier
 from pathlib import Path
 
 
 import downloaders.lyrics_api as lyrics_api
-import os
-import audio_processing.inference as inference
-import audio_processing.srt_process as srt_process
-import audio_processing.timestamps as timestamps
+from audio_processing.pipeline import process_audio
+from audio_processing.language import detect_lyrics_language
 import msgpack
 
 
@@ -35,6 +32,10 @@ def internal_error(error):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+@app.route("/display")
+def display():
+    return render_template("display.html")
 
 @app.route("/simple_page")
 def custom_song():
@@ -74,6 +75,8 @@ def process(artist: str, song: str):
             app.logger.error(f"Lyrics not found for {artist} - {song}")
             abort(404)  # This will trigger the 404 error handler
         lyrics = "\n".join([line for line in lyrics.splitlines() if line.strip()])
+        detected_language = detect_lyrics_language(lyrics)
+        app.logger.info("Detected language from lyrics: %s", detected_language)
         send_message("processing_notification")
         filename, youtube_id = lyrics_api.download_song_audio(artist, song)
 
@@ -81,31 +84,9 @@ def process(artist: str, song: str):
         
         audio_file = f"processing/input_audio/{filename}"
         
-        audio_filename = os.path.basename(audio_file).replace('.mp3', '')
-
-        generated_files = inference.split_audio(audio_file)
-        instrumental_audio = generated_files[1]
-        vocals_audio = generated_files[0]
-        print(f"Generated instrumental audio")
-
-        language_id = EncoderClassifier.from_hparams(source="speechbrain/lang-id-voxlingua107-ecapa", savedir="tmp", run_opts={"device":"cuda"})
-        signal = language_id.load_audio(vocals_audio)
-        prediction =  language_id.classify_batch(signal)
-        print(f"-----------------DETECTED LANGUAGE {prediction[3][0]}-----------------------------")
-        detected_language = prediction[3][0].split(":")[0]
-        if detected_language == "sco":
-            detected_language = "en"
-        
-
-        word_level_srt = timestamps.generate_word_timestamps(lyrics, vocals_audio, language=detected_language)
-        sentence_level_srt = srt_process.word_to_sentence_level_srt(
-            srt_file_path=word_level_srt,
-            lyrics=lyrics,
-            output_file_path=f"processing/sentence_level_srt/{audio_filename}.srt"
-        )
-
-        send_file(vocals_audio, type="wavefile")
-        send_file(sentence_level_srt, type="srtfile")
+        processed = process_audio(audio_file, lyrics, detected_language)
+        send_file(processed["instrumental_audio"], type="wavefile")
+        send_file(processed["sentence_level_srt"], type="srtfile")
         send_file(thumbnail_path, type="pngfile")
         return "OK"
     
@@ -127,10 +108,13 @@ def youtube_video(video_id: str):
 
 @sock.route('/webSockets')
 def echo(ws):
-    while True:
-        data = ws.receive()
-        client_list.append(ws)
-        print(f"Received data: {data}")
+    client_list.append(ws)
+    try:
+        while ws.receive() is not None:
+            pass
+    finally:
+        if ws in client_list:
+            client_list.remove(ws)
 
 
 
@@ -148,7 +132,8 @@ def send_file(filepath: str,type: str):
         try:
             client.send(packed)
         except: 
-            client_list.remove(client)
+            if client in client_list:
+                client_list.remove(client)
 
 
 def send_message(message: str):
@@ -164,4 +149,5 @@ def send_message(message: str):
         try:
             client.send(packed)
         except: 
-            client_list.remove(client)
+            if client in client_list:
+                client_list.remove(client)
