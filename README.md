@@ -1,5 +1,5 @@
 # Domeoke
-## Custom Karaoke Software for domes
+## Custom Generative Karaoke Software
 
 ### General Description:
 Domeoke is a fully featured software to play Karaoke songs in a dome. Through a simple user interface, a user can connect into the server and select any song that they want to sing.
